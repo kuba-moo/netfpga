@@ -18,6 +18,8 @@ registers.v
 *.so
 .*.swp
 
+synth/
+
 nf_download
 .tmp_versions/
 Module.symvers
