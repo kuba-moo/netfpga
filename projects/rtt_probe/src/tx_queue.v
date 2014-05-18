@@ -26,16 +26,22 @@ module tx_queue
     input 		   in_wr,
     output 		   in_rdy,
 
+    // --- GMII signals for timestamping
+    input 		   gmii_tx_en,
+
     // --- MAC side signals (txcoreclk domain)
 
     input 		   gmac_tx_ack,
     output reg 		   gmac_tx_dvld,
-    output [7:0] 	   gmac_tx_data,
+    output reg [7:0] 	   gmac_tx_data,
+
+    // --- timestamping counter
+    input 		   count64,
 
     // --- Register interface
     input 		   tx_queue_en,
     output 		   tx_pkt_sent,
-    output reg 		   tx_pkt_stored,
+    output reg 		   tx_pkt_stored, // pulse after packet done
     output reg [11:0] 	   tx_pkt_byte_cnt,
     output reg [9:0] 	   tx_pkt_word_cnt,
 
@@ -64,7 +70,7 @@ module tx_queue
    parameter WAIT_FOR_ACK = 2;
    parameter WAIT_FOR_EOP = 4;
    parameter WAIT_FOR_BYTE_COUNT = 8;
-   parameter TX_DONE = 16;
+   parameter APPEND_TS = 16;
 
    // Number of packets waiting:
    //
@@ -77,6 +83,7 @@ module tx_queue
 
    wire [DATA_WIDTH+CTRL_WIDTH-1:0] arranged_din;
    wire                             eop;
+   wire [7:0] 			    tx_fifo_data;
    reg                              tx_fifo_rd_en;
    wire                             tx_fifo_empty;
    wire                             tx_fifo_almost_full;
@@ -99,6 +106,9 @@ module tx_queue
 
    wire                             txfifo_wr;
 
+   reg [2:0] 			    ts_cnt;
+   reg [2:0] 			    ts_cnt_nxt;
+
    // ------------ Modules -------------
 
    /* pkts removed from the output queues are buffered here
@@ -114,7 +124,7 @@ module tx_queue
          .wr_en(txfifo_wr),
          .wr_clk(clk),
 
-         .dout({eop,gmac_tx_data}),
+         .dout({eop,tx_fifo_data}),
          .rd_en(tx_fifo_rd_en),
          .rd_clk(txcoreclk),
 
@@ -131,7 +141,7 @@ module tx_queue
          .wr_en(txfifo_wr),
          .wr_clk(clk),
 
-         .dout({eop,gmac_tx_data}),
+         .dout({eop,tx_fifo_data}),
          .rd_en(tx_fifo_rd_en),
          .rd_clk(txcoreclk),
 
@@ -275,6 +285,8 @@ module tx_queue
       byte_count_ld = 0;
       byte_count_en = 0;
       pkt_sent_txclk = 0;
+      ts_cnt_nxt = ts_cnt + 1;
+      gmac_tx_data = tx_fifo_data;
 
       case (tx_mac_state)
 
@@ -296,34 +308,53 @@ module tx_queue
         end
 
         WAIT_FOR_EOP: begin
+	   gmac_tx_dvld_nxt = 1;
+	   ts_cnt_nxt = 2'h0;
            if (eop) begin
               if (&byte_count) begin // the last data byte was the last of the word so we are done.
-                 tx_mac_state_nxt = IDLE;
-                 pkt_sent_txclk = 1;
+                 tx_mac_state_nxt = APPEND_TS;
+		 //pkt_sent_txclk = 1;
               end
               else begin // need to keep reading until we have read last of the word
+                 tx_mac_state_nxt = WAIT_FOR_BYTE_COUNT;
                  tx_fifo_rd_en = 1;
                  byte_count_en = 1;
-                 tx_mac_state_nxt = WAIT_FOR_BYTE_COUNT;
-              end
+	      end
            end // if (eop)
            else begin // Not EOP - keep reading!
               tx_fifo_rd_en = 1;
-              gmac_tx_dvld_nxt = 1;
               byte_count_en = 1;
            end
         end
 
         WAIT_FOR_BYTE_COUNT: begin
+	   gmac_tx_dvld_nxt = ~(&ts_cnt);
+	   gmac_tx_data = ts_cnt;
+
            if (&byte_count) begin
-              tx_mac_state_nxt = IDLE;
-              pkt_sent_txclk = 1;
+	      if (!gmac_tx_dvld) begin
+		 tx_mac_state_nxt = IDLE;
+		 pkt_sent_txclk = 1;
+	      end
+	      else begin
+		 tx_mac_state_nxt = APPEND_TS;
+	      end
            end
            else begin // need to keep reading until we have read last byte of the word
               tx_fifo_rd_en = 1;
               byte_count_en = 1;
            end
         end
+
+	APPEND_TS: begin
+	   gmac_tx_dvld_nxt = ~(&ts_cnt);
+	   gmac_tx_data = ts_cnt;
+
+	   if (!gmac_tx_dvld) begin
+	      tx_mac_state_nxt = IDLE;
+	      pkt_sent_txclk = 1;
+	   end
+	end
 
         default: begin // synthesis translate_off
           if (!reset && $time > 4000) $display("%t ERROR: (%m) state machine in illegal state 0x%x",
@@ -354,6 +385,7 @@ module tx_queue
          endcase
          tx_mac_state <= tx_mac_state_nxt;
          gmac_tx_dvld <= gmac_tx_dvld_nxt;
+	 ts_cnt <= ts_cnt_nxt;
       end
    end // always @ (posedge txcoreclk)
 

@@ -146,6 +146,9 @@
       .clk                              (clk),
       .rxcoreclk                        (rxgmiimiiclk));
 
+   wire [63:0] 	  count64;
+   counter64 counter64(count64, clk, reset);
+
    tx_queue
      #(.DATA_WIDTH(DATA_WIDTH),
        .CTRL_WIDTH(CTRL_WIDTH),
@@ -157,6 +160,10 @@
       .in_wr                            (in_wr),
       .in_data                          (in_data),
       .in_rdy                           (in_rdy),
+      // gmii interface
+      .gmii_tx_en                       (gmii_tx_en),
+      // timestamping
+      .count64                          (count64),
       // gmac interface
       .gmac_tx_data                     (gmac_tx_data),
       .gmac_tx_dvld                     (gmac_tx_dvld),
