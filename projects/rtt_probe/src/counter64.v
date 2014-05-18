@@ -3,20 +3,18 @@
 module  counter64
 (
  // -- counter value
- output [63:0] count64,
+ output reg [63:0] count64,
 
  // -- misc
- input 	       clk,
- input 	       reset
+ input 	       clk
  );
 
    reg [63:0]  value64;
 
    always @(posedge clk) begin
-      if (reset)
-	value64 <= 0;
-      else
-	value64 <= value64 + 1;
+      value64 <= value64 + 1;
+
+      count64 <= value64;
    end
 
 endmodule // output

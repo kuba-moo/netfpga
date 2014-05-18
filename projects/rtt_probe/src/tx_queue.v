@@ -36,7 +36,7 @@ module tx_queue
     output reg [7:0] 	   gmac_tx_data,
 
     // --- timestamping counter
-    input 		   count64,
+    input [63:0] 	   count64,
 
     // --- Register interface
     input 		   tx_queue_en,
@@ -108,6 +108,10 @@ module tx_queue
 
    reg [2:0] 			    ts_cnt;
    reg [2:0] 			    ts_cnt_nxt;
+
+   reg [63:0] 			    count64_latch;
+   reg 				    gmii_tx_en_d;
+
 
    // ------------ Modules -------------
 
@@ -329,7 +333,7 @@ module tx_queue
 
         WAIT_FOR_BYTE_COUNT: begin
 	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = ts_cnt;
+	   gmac_tx_data = count64_latch[ts_cnt*8 +: 8];
 
            if (&byte_count) begin
 	      if (!gmac_tx_dvld) begin
@@ -348,7 +352,7 @@ module tx_queue
 
 	APPEND_TS: begin
 	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = ts_cnt;
+	   gmac_tx_data = count64_latch[ts_cnt*8 +: 8];
 
 	   if (!gmac_tx_dvld) begin
 	      tx_mac_state_nxt = IDLE;
@@ -388,6 +392,18 @@ module tx_queue
 	 ts_cnt <= ts_cnt_nxt;
       end
    end // always @ (posedge txcoreclk)
+
+   always @(posedge txcoreclk) begin
+      if (reset_txclk) begin
+	 count64_latch <= 0;
+      end
+      else begin
+	 if (!gmii_tx_en_d & gmii_tx_en)
+	   count64_latch <= count64;
+      end
+
+      gmii_tx_en_d <= gmii_tx_en;
+   end
 
    // byte counter.
    always @(posedge txcoreclk)
