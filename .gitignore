@@ -18,6 +18,9 @@ registers.v
 *.so
 .*.swp
 
+coregen/
+
+xlnx_auto_0*
 synth/
 
 nf_download
