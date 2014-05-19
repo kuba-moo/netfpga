@@ -33,32 +33,38 @@
       parameter STAGE_NUMBER    = 'hff,
       parameter PORT_NUMBER     = 0
       )
-   (output reg [DATA_WIDTH-1:0]        out_data,
-    output reg [CTRL_WIDTH-1:0]        out_ctrl,
-    output reg                         out_wr,
-    input                              out_rdy,
+   (output reg [DATA_WIDTH-1:0] out_data,
+    output reg [CTRL_WIDTH-1:0] out_ctrl,
+    output reg 			out_wr,
+    input 			out_rdy,
+
+    // --- GMII signals for timestamping
+    input 			gmii_rx_dvld,
 
     // --- MAC side signals (rxcoreclk domain)
 
-    input  [7:0]                       gmac_rx_data,
-    input                              gmac_rx_dvld,
-    input                              gmac_rx_goodframe,
-    input                              gmac_rx_badframe,
+    input [7:0] 		gmac_rx_data,
+    input 			gmac_rx_dvld,
+    input 			gmac_rx_goodframe,
+    input 			gmac_rx_badframe,
+
+    // --- timestamping counter
+    input [63:0] 		count64,
 
     // --- Register interface
-    output                             rx_pkt_good,
-    output                             rx_pkt_bad,
-    output                             rx_pkt_dropped,
-    output reg [11:0]                  rx_pkt_byte_cnt,
-    output reg [9:0]                   rx_pkt_word_cnt,
-    output reg                         rx_pkt_pulled,
-    input                              rx_queue_en,
+    output 			rx_pkt_good,
+    output 			rx_pkt_bad,
+    output 			rx_pkt_dropped,
+    output reg [11:0] 		rx_pkt_byte_cnt,
+    output reg [9:0] 		rx_pkt_word_cnt,
+    output reg 			rx_pkt_pulled,
+    input 			rx_queue_en,
 
     // --- Misc
 
-    input                              reset,
-    input                              clk,
-    input                              rxcoreclk
+    input 			reset,
+    input 			clk,
+    input 			rxcoreclk
    );
 
    function integer log2;
@@ -74,7 +80,8 @@
    // ------------ Internal Params --------
    parameter OUT_WAIT_PKT_AVAIL = 0;
    parameter OUT_LENGTH         = 1;
-   parameter OUT_WAIT_PKT_DONE  = 2;
+   parameter OUT_TSTAMP         = 2;
+   parameter OUT_WAIT_PKT_DONE  = 4;
 
    parameter RX_IDLE            = 1;
    parameter RX_RCV_PKT         = 2;
@@ -103,8 +110,8 @@
    wire                            pkt_chk_fifo_dout;
    wire                            pkt_chk_fifo_empty;
 
-   reg [1:0]                       out_state_nxt;
-   reg [1:0]                       out_state;
+   reg [2:0]                       out_state_nxt;
+   reg [2:0]                       out_state;
 
    reg [7:0]                       gmac_rx_data_d1;
    reg                             dvld_d1;
@@ -118,6 +125,7 @@
    reg                             reset_rx_clk;
 
    reg [PKT_BYTE_CNT_WIDTH-1:0]    num_bytes_written;
+   wire [PKT_BYTE_CNT_WIDTH-1:0]   pkt_byte_len_orig;
    wire [PKT_BYTE_CNT_WIDTH-1:0]   pkt_byte_len;
    wire [PKT_WORD_CNT_WIDTH-1:0]   pkt_word_len;
 
@@ -129,8 +137,15 @@
 
    reg                             rx_pkt_pulled_nxt;
 
-   wire [`IOQ_WORD_LEN_POS - `IOQ_SRC_PORT_POS-1:0] port_number = PORT_NUMBER;
+   reg 				   tstamp_rd;
+   wire [71:0] 			   tstamp_dout;
+   reg 				   gmii_rx_dvld_d;
+   reg 				   output_tstamp;
 
+   reg 				   tstamp_trgr_rxclk;
+   wire 			   tstamp_trgr;
+
+   wire [`IOQ_WORD_LEN_POS - `IOQ_SRC_PORT_POS-1:0] port_number = PORT_NUMBER;
 
    // ------------ Modules -------------
 
@@ -188,7 +203,7 @@
                .wr_en   (rx_pkt_bad_rxclk | rx_pkt_good_rxclk),
                .wr_clk  (rxcoreclk),
 
-               .dout    ({pkt_chk_fifo_dout, pkt_byte_len}),
+               .dout    ({pkt_chk_fifo_dout, pkt_byte_len_orig}),
                .rd_en   (pkt_chk_fifo_rd_en),
                .rd_clk  (clk),
 
@@ -229,6 +244,20 @@
       end // if (ENABLE_HEADER) else
    endgenerate
 
+   // async fifo to get timestamps from one clock domain to the other
+   fifo_128x72 tstamp_fifo
+     (
+      .din ({8'h0, count64}),
+      .wr_en (tstamp_trgr),
+
+      .dout (tstamp_dout),
+      .rd_en (tstamp_rd),
+
+      .empty (),
+      .full (),
+      .clk (clk),
+      .rst (reset)
+      );
 
    // these modules move pulses from one clk domain to the other
    pulse_synchronizer rx_pkt_bad_sync
@@ -255,6 +284,20 @@
       .reset_clkA    (reset_rx_clk),
       .reset_clkB    (reset));
 
+   pulse_synchronizer tstamp
+     (.pulse_in_clkA (tstamp_trgr_rxclk),
+      .clkA          (rxcoreclk),
+      .pulse_out_clkB(tstamp_trgr),
+      .clkB          (clk),
+      .reset_clkA    (reset_rx_clk),
+      .reset_clkB    (reset));
+
+
+   always @(posedge rxcoreclk) begin
+      tstamp_trgr_rxclk = gmii_rx_dvld & ~gmii_rx_dvld_d;
+
+      gmii_rx_dvld_d <= gmii_rx_dvld;
+   end
 
    // extend reset over to MAC domain
    reg reset_long;
@@ -287,15 +330,19 @@
             assign out_ctrl_tmp[i] = rx_fifo_dout[i*9+8];
          end // for
 
+	 assign pkt_byte_len = pkt_byte_len_orig + 8;
+
          assign pkt_word_len = pkt_byte_len[LAST_WORD_BYTE_CNT_WIDTH-1:0] == 0 ?
             pkt_byte_len[PKT_BYTE_CNT_WIDTH-1:LAST_WORD_BYTE_CNT_WIDTH] :
             pkt_byte_len[PKT_BYTE_CNT_WIDTH-1:LAST_WORD_BYTE_CNT_WIDTH] + 1;
 
-         assign out_data_local = output_len ?
-            {pkt_word_len,
-             port_number,
-             {(`IOQ_SRC_PORT_POS - PKT_BYTE_CNT_WIDTH){1'b0}}, pkt_byte_len} : out_data_tmp;
-         assign out_ctrl_local = output_len ? STAGE_NUMBER : out_ctrl_tmp;
+         assign out_data_local = output_len
+				 ? {pkt_word_len, port_number,
+				    {(`IOQ_SRC_PORT_POS - PKT_BYTE_CNT_WIDTH){1'b0}}, pkt_byte_len}
+				 : (output_tstamp
+				    ? tstamp_dout[63:0]
+				    : out_data_tmp);
+         assign out_ctrl_local = output_len ? STAGE_NUMBER : (output_tstamp ? tstamp_dout[71:64] : out_ctrl_tmp);
       end
       else begin
          for (i=0; i<CTRL_WIDTH; i=i+1) begin: swap_dout
@@ -319,14 +366,18 @@
       output_len           = 0;
       rx_pkt_pulled_nxt    = 0;
 
+      output_tstamp  = 0;
+      tstamp_rd = 0;
+
       case (out_state)
 
         OUT_WAIT_PKT_AVAIL: begin
            if(!pkt_chk_fifo_empty) begin
               pkt_chk_fifo_rd_en   = 1;
               rx_fifo_rd_en        = 1;
+	      tstamp_rd            = 1;
               if (ENABLE_HEADER)
-                 out_state_nxt = OUT_LENGTH;
+		 out_state_nxt = OUT_LENGTH;
               else
                  out_state_nxt = OUT_WAIT_PKT_DONE;
            end
@@ -336,9 +387,17 @@
            output_len     = 1;
            out_wr_local   = pkt_chk_fifo_dout & out_rdy;
            if (out_rdy || !pkt_chk_fifo_dout) begin
-              out_state_nxt = OUT_WAIT_PKT_DONE;
+              out_state_nxt = OUT_TSTAMP;
            end
         end
+
+	OUT_TSTAMP: begin
+           output_tstamp  = 1;
+           out_wr_local   = pkt_chk_fifo_dout & out_rdy;
+           if (out_rdy || !pkt_chk_fifo_dout) begin
+              out_state_nxt = OUT_WAIT_PKT_DONE;
+           end
+	end
 
         OUT_WAIT_PKT_DONE: begin
            /* if this is the last word */

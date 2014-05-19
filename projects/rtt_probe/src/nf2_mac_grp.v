@@ -116,6 +116,9 @@
        .gmii_col		(gmii_col),
        .gmii_crs	        (gmii_crs));
 
+   wire [63:0] 	  count64;
+   counter64 counter64_rx(count64, clk);
+
    rx_queue
      #(.DATA_WIDTH(DATA_WIDTH),
        .CTRL_WIDTH(CTRL_WIDTH),
@@ -128,6 +131,10 @@
       .out_wr                           (out_wr),
       .out_data                         (out_data),
       .out_rdy                          (out_rdy),
+      // gmii interface
+      .gmii_rx_dvld                     (gmii_rx_dv),
+      // timestamping
+      .count64                          (count64),
       // gmac interface
       .gmac_rx_data                     (gmac_rx_data),
       .gmac_rx_dvld                     (gmac_rx_dvld),
