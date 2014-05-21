@@ -112,6 +112,14 @@ module tx_queue
    reg [63:0] 			    count64_latch;
    reg 				    gmii_tx_en_d;
 
+   reg tx_start_txclk;
+
+   wire tx_start;
+
+   reg [63:0] count64_latch_clk;
+   reg [63:0] count64_d1;
+   reg [63:0] count64_d2;
+
 
    // ------------ Modules -------------
 
@@ -260,9 +268,32 @@ module tx_queue
      end
    endgenerate
 
+   always @(posedge clk) begin
+      if (tx_start)
+	count64_latch_clk <= count64;
+   end
+
    //
    //------ Following is in MAC clock domain (125MHz/12.5Mhz/1.25Mhz) -----------
    //
+
+   always @(posedge txcoreclk) begin
+      tx_start_txclk <= ~gmii_tx_en_d & gmii_tx_en;
+
+      gmii_tx_en_d <= gmii_tx_en;
+
+      count64_d1 <= count64_latch_clk;
+      count64_d2 <= count64_d1;
+      count64_latch <= count64_d2;
+   end
+
+   pulse_synchronizer tx_tstamp_synchronizer
+     (.pulse_in_clkA (tx_start_txclk),
+      .clkA          (txcoreclk),
+      .pulse_out_clkB(tx_start),
+      .clkB          (clk),
+      .reset_clkA    (reset_tx_clk),
+      .reset_clkB    (reset));
 
    // sync the enable signal from the core to the tx clock domains
    always @(posedge txcoreclk) begin
@@ -289,7 +320,7 @@ module tx_queue
       byte_count_ld = 0;
       byte_count_en = 0;
       pkt_sent_txclk = 0;
-      ts_cnt_nxt = ts_cnt + 1;
+      ts_cnt_nxt = ts_cnt - 1;
       gmac_tx_data = tx_fifo_data;
 
       case (tx_mac_state)
@@ -313,7 +344,7 @@ module tx_queue
 
         WAIT_FOR_EOP: begin
 	   gmac_tx_dvld_nxt = 1;
-	   ts_cnt_nxt = 2'h0;
+	   ts_cnt_nxt = 'h7;
            if (eop) begin
               if (&byte_count) begin // the last data byte was the last of the word so we are done.
                  tx_mac_state_nxt = APPEND_TS;
@@ -332,8 +363,8 @@ module tx_queue
         end
 
         WAIT_FOR_BYTE_COUNT: begin
-	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = count64_latch[(8 - ts_cnt)*8 - 1 -: 8];
+	   gmac_tx_dvld_nxt = (|ts_cnt);
+	   gmac_tx_data = count64_latch[8*ts_cnt +: 8];
 
            if (&byte_count) begin
 	      if (!gmac_tx_dvld) begin
@@ -351,8 +382,8 @@ module tx_queue
         end
 
 	APPEND_TS: begin
-	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = count64_latch[(8 - ts_cnt)*8 - 1 -: 8];
+	   gmac_tx_dvld_nxt = (|ts_cnt);
+	   gmac_tx_data = count64_latch[8*ts_cnt +: 8];
 
 	   if (!gmac_tx_dvld) begin
 	      tx_mac_state_nxt = IDLE;
@@ -392,18 +423,6 @@ module tx_queue
 	 ts_cnt <= ts_cnt_nxt;
       end
    end // always @ (posedge txcoreclk)
-
-   always @(posedge txcoreclk) begin
-      if (reset_txclk) begin
-	 count64_latch <= 0;
-      end
-      else begin
-	 if (!gmii_tx_en_d & gmii_tx_en)
-	   count64_latch <= count64;
-      end
-
-      gmii_tx_en_d <= gmii_tx_en;
-   end
 
    // byte counter.
    always @(posedge txcoreclk)
