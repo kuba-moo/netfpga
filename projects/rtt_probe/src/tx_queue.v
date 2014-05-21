@@ -333,7 +333,7 @@ module tx_queue
 
         WAIT_FOR_BYTE_COUNT: begin
 	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = count64_latch[ts_cnt*8 +: 8];
+	   gmac_tx_data = count64_latch[(8 - ts_cnt)*8 - 1 -: 8];
 
            if (&byte_count) begin
 	      if (!gmac_tx_dvld) begin
@@ -352,7 +352,7 @@ module tx_queue
 
 	APPEND_TS: begin
 	   gmac_tx_dvld_nxt = ~(&ts_cnt);
-	   gmac_tx_data = count64_latch[ts_cnt*8 +: 8];
+	   gmac_tx_data = count64_latch[(8 - ts_cnt)*8 - 1 -: 8];
 
 	   if (!gmac_tx_dvld) begin
 	      tx_mac_state_nxt = IDLE;
