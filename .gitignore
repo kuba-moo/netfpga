@@ -18,10 +18,20 @@ registers.v
 *.so
 .*.swp
 
+# stuff from synth/ directories
+synth.txt*
+nf2_top*
+cpci_top*
+*.lst
+*.twr
+*.ngo
+*.ncd
+
 coregen/
 
+
 xlnx_auto_0*
-synth/
+xst/
 
 nf_download
 .tmp_versions/
@@ -47,5 +57,3 @@ projects/scone/lib/
 scone
 bad_pkt_dump
 selftest
-
-projects/rtt_probe/synth/
