@@ -49,6 +49,19 @@ module stats
    // Define the log2 function
    `LOG2_FUNC
 
+   //--------------------- Internal Parameter-------------------------
+   localparam WAIT_HDRS      = 1;
+   localparam DROP_TIMESTAMP = 2;
+   localparam THRU           = 4;
+
+   localparam SAVE_RX_TS     = 8;
+   localparam SAVE_TX_TS     = 16;
+   localparam WRITE_STAT     = 32;
+
+   localparam RO_HDRS        = 64;
+   localparam RO_DATA        = 128;
+   localparam RO_END         = 256;
+
    //------------------------- Signals-------------------------------
 
    wire [DATA_WIDTH-1:0]         in_fifo_data;
@@ -59,16 +72,49 @@ module stats
 
    reg                           in_fifo_rd_en;
    reg                           out_wr_int;
+   reg [DATA_WIDTH-1:0] 	 out_data_int;
+   reg [CTRL_WIDTH-1:0] 	 out_ctrl_int;
 
    wire [31:0] 			 soft_reg;
+   reg [31:0] 			 soft_reg_val;
+
+   reg [8:0] 			 state;
+   reg [8:0] 			 state_nxt;
+
+   reg [31:0] 			 stat_rx_ts;
+   reg [31:0] 			 stat_rx_ts_nxt;
+   wire [31:0] 			 stat_tx_ts;
+
+   wire [63:0] 			 stat_fifo_dout_p0;
+   wire [63:0] 			 stat_fifo_dout_p1;
+   wire [1:0] 			 stat_fifo_re;
+   wire [1:0] 			 stat_fifo_we;
+   wire [1:0]			 stat_fifo_afull;
+   wire [1:0]			 stat_fifo_empty;
+
+   reg 	[1:0]			 stat_sel;
+   reg 	[1:0]			 stat_sel_nxt;
+   reg 				 stat_curr_re;
+   reg 				 stat_curr_we;
+   wire 			 stat_curr_afull;
+   wire 			 stat_curr_empty;
 
    //------------------------- Local assignments -------------------------------
 
    assign in_rdy     = !in_fifo_nearly_full;
    assign out_wr     = out_wr_int;
-   assign out_data   = in_fifo_data;
-   assign out_ctrl   = in_fifo_ctrl;
+   assign out_ctrl   = out_ctrl_int;
+   assign out_data   = out_data_int;
 
+   assign stat_fifo_re = {2{stat_curr_re}} & stat_sel;
+   assign stat_fifo_we = {2{stat_curr_we}} & stat_sel;
+   assign stat_curr_afull = |(stat_fifo_afull & stat_sel);
+   assign stat_curr_empty = |(stat_fifo_empty & stat_sel);
+   assign soft_reg = soft_reg_val;
+
+   // @rx_ts is at the beginning of packet, so we need to save it
+   // @tx_ts is at the end, so we just fire @stat_fifo_we at the right time
+   assign stat_tx_ts = in_fifo_data[31:0];
 
    //------------------------- Modules-------------------------------
 
@@ -87,6 +133,28 @@ module stats
       .reset         (reset),
       .clk           (clk)
    );
+
+   time_fifo stat_fifo_p0 (
+      .din({stat_rx_ts,stat_tx_ts}),
+      .rd_en(stat_fifo_re[0]),
+      .dout(stat_fifo_dout_p0),
+      .wr_en(stat_fifo_we[0]),
+
+      .empty(stat_fifo_empty[0]),
+      .full(stat_fifo_afull[0]),
+
+      .clk(clk));
+
+   time_fifo stat_fifo_p1 (
+      .din({stat_rx_ts,stat_tx_ts}),
+      .rd_en(stat_fifo_re[1]),
+      .dout(stat_fifo_dout_p1),
+      .wr_en(stat_fifo_we[1]),
+
+      .empty(stat_fifo_empty[1]),
+      .full(stat_fifo_afull[1]),
+
+      .clk(clk));
 
    generic_regs
    #(
@@ -126,16 +194,140 @@ module stats
     );
 
    //------------------------- Logic-------------------------------
+   always @* begin
+      state_nxt = state;
+      stat_sel_nxt = stat_sel;
+      stat_rx_ts_nxt = stat_rx_ts;
+      out_data_int = in_fifo_data;
+      out_ctrl_int = in_fifo_ctrl;
 
-   always @(*) begin
-      // Default values
       out_wr_int = 0;
       in_fifo_rd_en = 0;
+      stat_curr_we = 0;
+      stat_curr_re = 0;
 
-      if (!in_fifo_empty && out_rdy) begin
-         out_wr_int = 1;
-         in_fifo_rd_en = 1;
-      end
+      case (state)
+	WAIT_HDRS: begin
+	   if (!in_fifo_empty && out_rdy) begin
+	      in_fifo_rd_en = 1;
+
+	      if (in_fifo_data[`IOQ_DST_PORT_POS+3] ||     // 2 -> 00 00 00 10 = CPUq0
+		  in_fifo_data[`IOQ_DST_PORT_POS+1]) begin // 8 -> 00 00 10 00 = CPUq1
+		 stat_sel_nxt = {in_fifo_data[`IOQ_DST_PORT_POS+3],in_fifo_data[`IOQ_DST_PORT_POS+1]};
+
+		 // don't forward this packet
+
+		 state_nxt = SAVE_RX_TS;
+	      end
+	      else begin
+		 out_wr_int = 1;
+
+		 state_nxt = DROP_TIMESTAMP;
+	      end
+	   end
+	end // case: WAIT_HDRS
+
+	DROP_TIMESTAMP: begin
+	   if (!in_fifo_empty && out_rdy) begin
+	      in_fifo_rd_en = 1;
+
+	      state_nxt = THRU;
+	   end
+	end
+
+	THRU: begin
+	   if (!in_fifo_empty && out_rdy) begin
+	      in_fifo_rd_en = 1;
+              out_wr_int = 1;
+
+	      if (|in_fifo_ctrl)
+		state_nxt = WAIT_HDRS;
+	   end
+	end
+
+
+
+	SAVE_RX_TS: begin
+	   if (!in_fifo_empty && out_rdy) begin
+	      in_fifo_rd_en = 1;
+	      stat_rx_ts_nxt = in_fifo_data[31:0];
+
+	      state_nxt = SAVE_TX_TS;
+	   end
+	end
+
+	SAVE_TX_TS: begin
+	   if (!in_fifo_empty && out_rdy) begin
+	      in_fifo_rd_en = 1;
+	      if (|in_fifo_ctrl) begin
+		 stat_curr_we = 1;
+
+		 state_nxt = WRITE_STAT;
+	      end
+	   end
+	end // case: SAVE_TX_TS
+
+	WRITE_STAT: begin
+	   if (stat_curr_afull)
+	      state_nxt = RO_HDRS;
+	   else
+	      state_nxt = WAIT_HDRS;
+	end
+
+	RO_HDRS: begin
+	   if (out_rdy) begin
+              out_wr_int = 1;
+	      out_ctrl_int = `IO_QUEUE_STAGE_NUM;
+	      out_data_int = 64'h0040008100000401;
+	      //	   out_data_int = 64'h0000008000000400;
+	      //	   out_data_int[`IOQ_DST_PORT_POS+3] = stat_sel[1];
+	      //	   out_data_int[`IOQ_DST_PORT_POS+1] = stat_sel[0];
+
+	      stat_curr_re = 1;
+
+	      state_nxt = RO_DATA;
+	   end
+	end
+
+	RO_DATA: begin
+	   if (out_rdy) begin
+              out_wr_int = 1;
+	      out_ctrl_int = 16'h00;
+	      if (stat_sel[0])
+		out_data_int = stat_fifo_dout_p0;
+	      else
+		out_data_int = stat_fifo_dout_p1;
+
+	      stat_curr_re = 1;
+
+	      if (stat_curr_empty)
+		state_nxt = RO_END;
+	   end
+	end // case: RO_DATA
+
+	RO_END: begin
+	   if (out_rdy) begin
+              out_wr_int = 1;
+	      out_ctrl_int = 16'hfe;
+	      out_data_int = {32{stat_sel}};
+
+	      state_nxt = WAIT_HDRS;
+	   end
+	end
+
+      endcase
+   end
+
+   always @(posedge clk) begin
+      state <= state_nxt;
+      stat_sel <= stat_sel_nxt;
+      stat_rx_ts <= stat_rx_ts_nxt;
+
+      if (state == RO_HDRS)
+	soft_reg_val <= soft_reg_val + 1;
+
+      if (reset)
+	state <= WAIT_HDRS;
    end
 
 endmodule
