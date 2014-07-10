@@ -228,7 +228,7 @@ module stats
 	end // case: WAIT_HDRS
 
 	DROP_TIMESTAMP: begin
-	   if (!in_fifo_empty && out_rdy) begin
+	   if (!in_fifo_empty) begin
 	      in_fifo_rd_en = 1;
 
 	      state_nxt = THRU;
@@ -248,7 +248,7 @@ module stats
 
 
 	SAVE_RX_TS: begin
-	   if (!in_fifo_empty && out_rdy) begin
+	   if (!in_fifo_empty) begin
 	      in_fifo_rd_en = 1;
 	      stat_rx_ts_nxt = in_fifo_data[31:0];
 
@@ -257,8 +257,9 @@ module stats
 	end
 
 	SAVE_TX_TS: begin
-	   if (!in_fifo_empty && out_rdy) begin
+	   if (!in_fifo_empty) begin
 	      in_fifo_rd_en = 1;
+
 	      if (|in_fifo_ctrl) begin
 		 stat_curr_we = 1;
 
