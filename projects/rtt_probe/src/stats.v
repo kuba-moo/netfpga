@@ -89,14 +89,14 @@ module stats
    wire [63:0] 			 stat_fifo_dout_p1;
    wire [1:0] 			 stat_fifo_re;
    wire [1:0] 			 stat_fifo_we;
-   wire [1:0]			 stat_fifo_afull;
+   wire [1:0]			 stat_fifo_full;
    wire [1:0]			 stat_fifo_empty;
 
    reg 	[1:0]			 stat_sel;
    reg 	[1:0]			 stat_sel_nxt;
    reg 				 stat_curr_re;
    reg 				 stat_curr_we;
-   wire 			 stat_curr_afull;
+   wire 			 stat_curr_full;
    wire 			 stat_curr_empty;
 
    //------------------------- Local assignments -------------------------------
@@ -108,7 +108,7 @@ module stats
 
    assign stat_fifo_re = {2{stat_curr_re}} & stat_sel;
    assign stat_fifo_we = {2{stat_curr_we}} & stat_sel;
-   assign stat_curr_afull = |(stat_fifo_afull & stat_sel);
+   assign stat_curr_full = |(stat_fifo_full & stat_sel);
    assign stat_curr_empty = |(stat_fifo_empty & stat_sel);
    assign soft_reg = soft_reg_val;
 
@@ -141,7 +141,7 @@ module stats
       .wr_en(stat_fifo_we[0]),
 
       .empty(stat_fifo_empty[0]),
-      .full(stat_fifo_afull[0]),
+      .full(stat_fifo_full[0]),
 
       .clk(clk));
 
@@ -152,7 +152,7 @@ module stats
       .wr_en(stat_fifo_we[1]),
 
       .empty(stat_fifo_empty[1]),
-      .full(stat_fifo_afull[1]),
+      .full(stat_fifo_full[1]),
 
       .clk(clk));
 
@@ -268,7 +268,7 @@ module stats
 	end // case: SAVE_TX_TS
 
 	WRITE_STAT: begin
-	   if (stat_curr_afull)
+	   if (stat_curr_full)
 	      state_nxt = RO_HDRS;
 	   else
 	      state_nxt = WAIT_HDRS;
