@@ -278,10 +278,7 @@ module stats
 	   if (out_rdy) begin
               out_wr_int = 1;
 	      out_ctrl_int = `IO_QUEUE_STAGE_NUM;
-	      out_data_int = 64'h0040008100000401;
-	      //	   out_data_int = 64'h0000008000000400;
-	      //	   out_data_int[`IOQ_DST_PORT_POS+3] = stat_sel[1];
-	      //	   out_data_int[`IOQ_DST_PORT_POS+1] = stat_sel[0];
+	      out_data_int = 64'h0010008100000401;
 
 	      stat_curr_re = 1;
 
