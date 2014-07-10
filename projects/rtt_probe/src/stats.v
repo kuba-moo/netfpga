@@ -78,6 +78,10 @@ module stats
    wire [31:0] 			 soft_reg;
    reg [31:0] 			 soft_reg_val;
 
+   wire [DATA_WIDTH-1:0] 	 header_wo_ts;
+   wire [15:0] 			 pkt_byte_len_wo_ts;
+   wire [15:0] 			 pkt_word_len_wo_ts;
+
    reg [8:0] 			 state;
    reg [8:0] 			 state_nxt;
 
@@ -105,6 +109,13 @@ module stats
    assign out_wr     = out_wr_int;
    assign out_ctrl   = out_ctrl_int;
    assign out_data   = out_data_int;
+
+   assign pkt_byte_len_wo_ts = in_fifo_data[`IOQ_BYTE_LEN_POS + 15:`IOQ_BYTE_LEN_POS] - 8;
+   assign pkt_word_len_wo_ts = in_fifo_data[`IOQ_WORD_LEN_POS + 15:`IOQ_WORD_LEN_POS] - 1;
+   assign header_wo_ts = {in_fifo_data[`IOQ_DST_PORT_POS + 15:`IOQ_DST_PORT_POS],
+			  pkt_word_len_wo_ts,
+			  in_fifo_data[`IOQ_SRC_PORT_POS + 15:`IOQ_SRC_PORT_POS],
+			  pkt_byte_len_wo_ts};
 
    assign stat_fifo_re = {2{stat_curr_re}} & stat_sel;
    assign stat_fifo_we = {2{stat_curr_we}} & stat_sel;
@@ -221,6 +232,7 @@ module stats
 	      end
 	      else begin
 		 out_wr_int = 1;
+		 out_data_int = header_wo_ts;
 
 		 state_nxt = DROP_TIMESTAMP;
 	      end
