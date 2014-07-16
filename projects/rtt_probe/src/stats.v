@@ -52,6 +52,7 @@ module stats
    //--------------------- Internal Parameter-------------------------
    localparam WAIT_HDRS      = 1;
    localparam DROP_TIMESTAMP = 2;
+   localparam MAKE_SPACE_FOR_TX_TS = 512;
    localparam THRU           = 4;
 
    localparam SAVE_RX_TS     = 8;
@@ -79,8 +80,8 @@ module stats
    wire [15:0] 			 pkt_byte_len_wo_ts;
    wire [15:0] 			 pkt_word_len_wo_ts;
 
-   reg [8:0] 			 state;
-   reg [8:0] 			 state_nxt;
+   reg [9:0] 			 state;
+   reg [9:0] 			 state_nxt;
 
    reg [31:0] 			 stat_rx_ts;
    reg [31:0] 			 stat_rx_ts_nxt;
@@ -110,8 +111,8 @@ module stats
    assign out_ctrl   = out_ctrl_int;
    assign out_data   = out_data_int;
 
-   assign pkt_byte_len_wo_ts = in_fifo_data[`IOQ_BYTE_LEN_POS + 15:`IOQ_BYTE_LEN_POS] - 8;
-   assign pkt_word_len_wo_ts = in_fifo_data[`IOQ_WORD_LEN_POS + 15:`IOQ_WORD_LEN_POS] - 1;
+   assign pkt_byte_len_wo_ts = in_fifo_data[`IOQ_BYTE_LEN_POS + 15:`IOQ_BYTE_LEN_POS] - 16;
+   assign pkt_word_len_wo_ts = in_fifo_data[`IOQ_WORD_LEN_POS + 15:`IOQ_WORD_LEN_POS] - 2;
    assign header_wo_ts = {in_fifo_data[`IOQ_DST_PORT_POS + 15:`IOQ_DST_PORT_POS],
 			  pkt_word_len_wo_ts,
 			  in_fifo_data[`IOQ_SRC_PORT_POS + 15:`IOQ_SRC_PORT_POS],
@@ -239,6 +240,14 @@ module stats
 	end // case: WAIT_HDRS
 
 	DROP_TIMESTAMP: begin
+	   if (!in_fifo_empty) begin
+	      in_fifo_rd_en = 1;
+
+	      state_nxt = MAKE_SPACE_FOR_TX_TS;
+	   end
+	end
+
+	MAKE_SPACE_FOR_TX_TS: begin
 	   if (!in_fifo_empty) begin
 	      in_fifo_rd_en = 1;
 
