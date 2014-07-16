@@ -111,6 +111,27 @@ void dumpCounts()
   printf("Num pkts sent from port 3:             %u\n", val);
   readReg(&nf2, MAC_GRP_3_TX_QUEUE_NUM_BYTES_PUSHED_REG, &val);
   printf("Num bytes sent from port 3:            %u\n\n", val);
+
+#define quick_read(name)					\
+  ({								\
+	  readReg(&nf2, name, &val);				\
+	  printf(#name ":\t\t%u\n", val);			\
+  })
+  quick_read(STATS_CNT_DROP_HDR_REG);
+  quick_read(STATS_CNT_SAMPLES_REG);
+  quick_read(STATS_CNT_STAT_PKTS_REG);
+  quick_read(STATS_MARKER_REG);
+#if 1
+  {
+	  unsigned i, j;
+
+	  for (j = 0; j < 8; j++)
+		  for (i = 0; i <= 0x30; i += 4) {
+			  readReg(&nf2, MAC_GRP_0_CONTROL_REG + 0x40000*j + i, &val);
+			  printf("%x:\t\t%u\n", MAC_GRP_0_CONTROL_REG + 0x40000*j + i, val);
+	  }
+  }
+#endif
 }
 
 /*

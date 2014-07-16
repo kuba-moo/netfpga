@@ -4,12 +4,27 @@
         <nf:prefix>stats</nf:prefix>
         <nf:location>udp</nf:location>
         <nf:description>Stats Module Registers</nf:description>
-        <nf:blocksize>64</nf:blocksize>
+        <nf:blocksize>16</nf:blocksize>
         <nf:registers>
                 <nf:register>
-                        <nf:name>reset</nf:name>
-                        <nf:description>Reset the stats counter</nf:description>
-                        <nf:type>generic_software32</nf:type>
+                        <nf:name>cnt_drop_hdr</nf:name>
+                        <nf:description>Probes that are duplicated to both DUTs</nf:description>
+                        <nf:type>generic_counter32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>cnt_samples</nf:name>
+                        <nf:description>Samples received back from DUTs</nf:description>
+                        <nf:type>generic_counter32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>cnt_stat_pkts</nf:name>
+                        <nf:description>Generated statistic aggregates</nf:description>
+                        <nf:type>generic_counter32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>marker</nf:name>
+                        <nf:description>aabbccdd marker</nf:description>
+                        <nf:type>generic_hardware32</nf:type>
                 </nf:register>
         </nf:registers>
         <nf:constants>

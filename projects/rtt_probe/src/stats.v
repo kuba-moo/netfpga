@@ -75,9 +75,6 @@ module stats
    reg [DATA_WIDTH-1:0] 	 out_data_int;
    reg [CTRL_WIDTH-1:0] 	 out_ctrl_int;
 
-   wire [31:0] 			 soft_reg;
-   reg [31:0] 			 soft_reg_val;
-
    wire [DATA_WIDTH-1:0] 	 header_wo_ts;
    wire [15:0] 			 pkt_byte_len_wo_ts;
    wire [15:0] 			 pkt_word_len_wo_ts;
@@ -103,6 +100,9 @@ module stats
    wire 			 stat_curr_full;
    wire 			 stat_curr_empty;
 
+   reg [2:0] 			 reg_counters;
+   reg [`CPCI_NF2_DATA_WIDTH-1:0] reg_marker;
+
    //------------------------- Local assignments -------------------------------
 
    assign in_rdy     = !in_fifo_nearly_full;
@@ -121,7 +121,6 @@ module stats
    assign stat_fifo_we = {2{stat_curr_we}} & stat_sel;
    assign stat_curr_full = |(stat_fifo_full & stat_sel);
    assign stat_curr_empty = |(stat_fifo_empty & stat_sel);
-   assign soft_reg = soft_reg_val;
 
    // @rx_ts is at the beginning of packet, so we need to save it
    // @tx_ts is at the end, so we just fire @stat_fifo_we at the right time
@@ -170,11 +169,11 @@ module stats
    generic_regs
    #(
       .UDP_REG_SRC_WIDTH   (UDP_REG_SRC_WIDTH),
-      .TAG                 (0),                 // Tag -- eg. MODULE_TAG
-      .REG_ADDR_WIDTH      (1),                 // Width of block addresses -- eg. MODULE_REG_ADDR_WIDTH
-      .NUM_COUNTERS        (0),                 // Number of counters
-      .NUM_SOFTWARE_REGS   (1),                 // Number of sw regs
-      .NUM_HARDWARE_REGS   (0)                  // Number of hw regs
+      .TAG                 (`STATS_BLOCK_ADDR),           // Tag -- eg. MODULE_TAG
+      .REG_ADDR_WIDTH      (`STATS_REG_ADDR_WIDTH),       // Width of block addresses -- eg. MODULE_REG_ADDR_WIDTH
+      .NUM_COUNTERS        (3),                 // Number of counters
+      .NUM_SOFTWARE_REGS   (0),                 // Number of sw regs
+      .NUM_HARDWARE_REGS   (1)                  // Number of hw regs
    ) stats_regs (
       .reg_req_in       (reg_req_in),
       .reg_ack_in       (reg_ack_in),
@@ -191,14 +190,14 @@ module stats
       .reg_src_out      (reg_src_out),
 
       // --- counters interface
-      .counter_updates  (),
+      .counter_updates  (reg_counters),
       .counter_decrement(),
 
       // --- SW regs interface
-      .software_regs    (soft_reg),
+      .software_regs    (),
 
       // --- HW regs interface
-      .hardware_regs    (),
+      .hardware_regs    (reg_marker),
 
       .clk              (clk),
       .reset            (reset)
@@ -333,8 +332,11 @@ module stats
       stat_sel <= stat_sel_nxt;
       stat_rx_ts <= stat_rx_ts_nxt;
 
-      if (state == RO_HDRS)
-	soft_reg_val <= soft_reg_val + 1;
+      reg_counters[0] <= (state == WAIT_HDRS) && (state_nxt == DROP_TIMESTAMP);
+      reg_counters[1] <= (state == WAIT_HDRS) && (state_nxt == SAVE_RX_TS);
+      reg_counters[2] <= (state == RO_END) && (state_nxt == WAIT_HDRS);
+
+      reg_marker <= 32'haabbccdd;
 
       if (reset)
 	state <= WAIT_HDRS;
