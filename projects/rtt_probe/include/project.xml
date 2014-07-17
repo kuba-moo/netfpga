@@ -36,6 +36,7 @@
     <nf:group name="udp">
       <nf:instance name="in_arb" />
       <nf:instance name="stats" />
+      <nf:instance name="gener" />
       <nf:instance name="output_queues" />
     </nf:group>
   </nf:memalloc>

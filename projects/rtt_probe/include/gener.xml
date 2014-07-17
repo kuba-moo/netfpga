@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nf:module xmlns:nf="http://www.NetFPGA.org/NF2_register_system" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.NetFPGA.org/NF2_register_system NF2_register_system.xsd ">
+        <nf:name>gener</nf:name>
+        <nf:prefix>gener</nf:prefix>
+        <nf:location>udp</nf:location>
+        <nf:description>Generator Module Registers</nf:description>
+        <nf:blocksize>16</nf:blocksize>
+        <nf:registers>
+                <nf:register>
+                        <nf:name>cnt_pkts</nf:name>
+                        <nf:description>Number of generated packets</nf:description>
+                        <nf:type>generic_counter32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>ifg</nf:name>
+                        <nf:description>space between packets</nf:description>
+                        <nf:type>generic_software32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>len</nf:name>
+                        <nf:description>packet length</nf:description>
+                        <nf:type>generic_software32</nf:type>
+                </nf:register>
+                <nf:register>
+                        <nf:name>ctrl</nf:name>
+                        <nf:description>control register</nf:description>
+                        <nf:type>gener_control</nf:type>
+                </nf:register>
+        </nf:registers>
+        <nf:constants>
+        </nf:constants>
+        <nf:types>
+		<nf:type xsi:type="nf:SimpleType">
+			<nf:name>gener_control</nf:name>
+			<nf:width>1</nf:width>
+			<nf:bitmask>
+				<nf:name>reset</nf:name>
+				<nf:pos>0</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>enable_send</nf:name>
+				<nf:pos>1</nf:pos>
+			</nf:bitmask>
+		</nf:type>
+        </nf:types>
+</nf:module>

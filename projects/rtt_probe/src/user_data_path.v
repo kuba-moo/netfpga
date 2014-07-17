@@ -224,6 +224,19 @@ module user_data_path
    wire [`CPCI_NF2_DATA_WIDTH-1:0]  st_in_reg_data;
    wire [UDP_REG_SRC_WIDTH-1:0]     st_in_reg_src;
 
+   //------- gener wires/regs ------
+   wire [CTRL_WIDTH-1:0] 	    gn_in_ctrl;
+   wire [DATA_WIDTH-1:0]            gn_in_data;
+   wire                             gn_in_wr;
+   wire                             gn_in_rdy;
+
+   wire                             gn_in_reg_req;
+   wire                             gn_in_reg_ack;
+   wire                             gn_in_reg_rd_wr_L;
+   wire [`UDP_REG_ADDR_WIDTH-1:0]   gn_in_reg_addr;
+   wire [`CPCI_NF2_DATA_WIDTH-1:0]  gn_in_reg_data;
+   wire [UDP_REG_SRC_WIDTH-1:0]     gn_in_reg_src;
+
    //------- output queues wires/regs ------
    wire [CTRL_WIDTH-1:0]            oq_in_ctrl;
    wire [DATA_WIDTH-1:0]            oq_in_data;
@@ -366,10 +379,10 @@ module user_data_path
        .CTRL_WIDTH(CTRL_WIDTH),
        .UDP_REG_SRC_WIDTH (UDP_REG_SRC_WIDTH))
    stats
-     (.out_data            (oq_in_data),
-     .out_ctrl             (oq_in_ctrl),
-     .out_wr               (oq_in_wr),
-     .out_rdy              (oq_in_rdy),
+     (.out_data            (gn_in_data),
+     .out_ctrl             (gn_in_ctrl),
+     .out_wr               (gn_in_wr),
+     .out_rdy              (gn_in_rdy),
 
       // --- Interface to the rx input queues
      .in_data              (st_in_data),
@@ -384,6 +397,42 @@ module user_data_path
      .reg_addr_in          (st_in_reg_addr),
      .reg_data_in          (st_in_reg_data),
      .reg_src_in           (st_in_reg_src),
+
+     .reg_req_out          (gn_in_reg_req),
+     .reg_ack_out          (gn_in_reg_ack),
+     .reg_rd_wr_L_out      (gn_in_reg_rd_wr_L),
+     .reg_addr_out         (gn_in_reg_addr),
+     .reg_data_out         (gn_in_reg_data),
+     .reg_src_out          (gn_in_reg_src),
+
+      // --- Misc
+     .clk                  (clk),
+     .reset                (reset));
+
+
+   gener
+     #(.DATA_WIDTH(DATA_WIDTH),
+       .CTRL_WIDTH(CTRL_WIDTH),
+       .UDP_REG_SRC_WIDTH (UDP_REG_SRC_WIDTH))
+   gener
+     (.out_data            (oq_in_data),
+     .out_ctrl             (oq_in_ctrl),
+     .out_wr               (oq_in_wr),
+     .out_rdy              (oq_in_rdy),
+
+      // --- Interface to the rx input queues
+     .in_data              (gn_in_data),
+     .in_ctrl              (gn_in_ctrl),
+     .in_wr                (gn_in_wr),
+     .in_rdy               (gn_in_rdy),
+
+      // --- Register interface
+     .reg_req_in           (gn_in_reg_req),
+     .reg_ack_in           (gn_in_reg_ack),
+     .reg_rd_wr_L_in       (gn_in_reg_rd_wr_L),
+     .reg_addr_in          (gn_in_reg_addr),
+     .reg_data_in          (gn_in_reg_data),
+     .reg_src_in           (gn_in_reg_src),
 
      .reg_req_out          (oq_in_reg_req),
      .reg_ack_out          (oq_in_reg_ack),
