@@ -255,7 +255,7 @@ module gener
 
 	      out_wr_int = 1;
 
-	      out_ctrl_int = 8'hff;
+	      out_ctrl_int = 8'h01;
 
 	      state_nxt = WAIT_HDRS_OR_TIME;
 	      cnt_nxt = reg_ifg;

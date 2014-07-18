@@ -326,7 +326,7 @@ module stats
 	RO_END: begin
 	   if (out_rdy) begin
               out_wr_int = 1;
-	      out_ctrl_int = 8'hfe;
+	      out_ctrl_int = 8'hff; // make it identical to RO_HDRS, 8'h80 would suffice
 	      out_data_int = {32{stat_sel}};
 
 	      state_nxt = WAIT_HDRS;
