@@ -310,7 +310,7 @@ module stats
 	RO_DATA: begin
 	   if (out_rdy) begin
               out_wr_int = 1;
-	      out_ctrl_int = 16'h00;
+	      out_ctrl_int = 8'h00;
 	      if (stat_sel[0])
 		out_data_int = stat_fifo_dout_p0;
 	      else
@@ -326,7 +326,7 @@ module stats
 	RO_END: begin
 	   if (out_rdy) begin
               out_wr_int = 1;
-	      out_ctrl_int = 16'hfe;
+	      out_ctrl_int = 8'hfe;
 	      out_data_int = {32{stat_sel}};
 
 	      state_nxt = WAIT_HDRS;
