@@ -20,8 +20,7 @@ module tx_queue
       parameter STAGE_NUMBER = 'hff
    )
 
-   (
-    input [DATA_WIDTH-1:0] in_data,
+   (input [DATA_WIDTH-1:0] in_data,
     input [CTRL_WIDTH-1:0] in_ctrl,
     input 		   in_wr,
     output 		   in_rdy,
@@ -41,7 +40,7 @@ module tx_queue
     // --- Register interface
     input 		   tx_queue_en,
     output 		   tx_pkt_sent,
-    output reg 		   tx_pkt_stored, // pulse after packet done
+    output reg 		   tx_pkt_stored,
     output reg [11:0] 	   tx_pkt_byte_cnt,
     output reg [9:0] 	   tx_pkt_word_cnt,
 
@@ -351,9 +350,9 @@ module tx_queue
 		 //pkt_sent_txclk = 1;
               end
               else begin // need to keep reading until we have read last of the word
-                 tx_mac_state_nxt = WAIT_FOR_BYTE_COUNT;
                  tx_fifo_rd_en = 1;
                  byte_count_en = 1;
+                 tx_mac_state_nxt = WAIT_FOR_BYTE_COUNT;
 	      end
            end // if (eop)
            else begin // Not EOP - keep reading!
