@@ -4,7 +4,7 @@
         <nf:prefix>gener</nf:prefix>
         <nf:location>udp</nf:location>
         <nf:description>Generator Module Registers</nf:description>
-        <nf:blocksize>16</nf:blocksize>
+        <nf:blocksize>32</nf:blocksize>
         <nf:registers>
                 <nf:register>
                         <nf:name>cnt_pkts</nf:name>
@@ -12,9 +12,9 @@
                         <nf:type>generic_counter32</nf:type>
                 </nf:register>
                 <nf:register>
-                        <nf:name>ifg</nf:name>
-                        <nf:description>space between packets</nf:description>
-                        <nf:type>generic_software32</nf:type>
+                        <nf:name>ctrl</nf:name>
+                        <nf:description>control register</nf:description>
+                        <nf:type>gener_control</nf:type>
                 </nf:register>
                 <nf:register>
                         <nf:name>len</nf:name>
@@ -22,11 +22,16 @@
                         <nf:type>generic_software32</nf:type>
                 </nf:register>
                 <nf:register>
-                        <nf:name>ctrl</nf:name>
-                        <nf:description>control register</nf:description>
-                        <nf:type>gener_control</nf:type>
+                        <nf:name>ifg</nf:name>
+                        <nf:description>space between packets</nf:description>
+                        <nf:type>generic_software32</nf:type>
                 </nf:register>
-        </nf:registers>
+		<nf:register>
+                        <nf:name>status</nf:name>
+                        <nf:description>status register</nf:description>
+                        <nf:type>gener_status</nf:type>
+                </nf:register>
+	</nf:registers>
         <nf:constants>
         </nf:constants>
         <nf:types>
@@ -40,6 +45,41 @@
 			<nf:bitmask>
 				<nf:name>enable_send</nf:name>
 				<nf:pos>1</nf:pos>
+			</nf:bitmask>
+		</nf:type>
+		<nf:type xsi:type="nf:SimpleType">
+			<nf:name>gener_status</nf:name>
+			<nf:width>32</nf:width>
+			<nf:bitmask>
+				<nf:name>state</nf:name>
+				<nf:pos>0</nf:pos>
+				<nf:width>7</nf:width>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>out_rdy</nf:name>
+				<nf:pos>7</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>in_fifo_empty</nf:name>
+				<nf:pos>8</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>out_wr_int</nf:name>
+				<nf:pos>9</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>pkt_upcnt</nf:name>
+				<nf:pos>10</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>reg_len</nf:name>
+				<nf:pos>11</nf:pos>
+				<nf:width>5</nf:width>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>cnt</nf:name>
+				<nf:pos>16</nf:pos>
+				<nf:width>16</nf:width>
 			</nf:bitmask>
 		</nf:type>
         </nf:types>

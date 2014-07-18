@@ -82,6 +82,7 @@ module gener
    wire [31:0] 			 reg_ifg;
    wire [31:0]			 reg_len;
    wire [31:0]			 reg_ctrl;
+   wire [31:0]			 reg_hw_state;
 
    //------------------------- Local assignments -------------------------------
 
@@ -93,8 +94,17 @@ module gener
 
    assign gen_pkt_hdr = { 16'h05,        // dst
 			  reg_len[18:3], // len words
-			  16'h40,        // src - doesn't matter
+			  16'h00,        // src - doesn't matter
 			  reg_len[15:0]};// len bytes
+
+   assign reg_hw_state = {cnt,          // 31:16
+			  reg_len[7:3], // 15:11
+			  pkt_upcnt,    // 10
+			  out_wr_int,   // 9
+			  in_fifo_empty,// 8
+			  out_rdy,      // 7
+			  state         // 6:0
+			  };
 
    //------------------------- Modules-------------------------------
 
@@ -121,7 +131,7 @@ module gener
       .REG_ADDR_WIDTH      (`GENER_REG_ADDR_WIDTH),   // Width of block addresses -- eg. MODULE_REG_ADDR_WIDTH
       .NUM_COUNTERS        (1),                 // Number of counters
       .NUM_SOFTWARE_REGS   (3),                 // Number of sw regs
-      .NUM_HARDWARE_REGS   (0)                  // Number of hw regs
+      .NUM_HARDWARE_REGS   (1)                  // Number of hw regs
    ) module_regs (
       .reg_req_in       (reg_req_in),
       .reg_ack_in       (reg_ack_in),
@@ -145,7 +155,7 @@ module gener
       .software_regs    ({reg_ifg, reg_len, reg_ctrl}),
 
       // --- HW regs interface
-      .hardware_regs    (),
+      .hardware_regs    (reg_hw_state),
 
       .clk              (clk),
       .reset            (reset)
