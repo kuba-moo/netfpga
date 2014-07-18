@@ -185,9 +185,10 @@ module gener
 
 	      state_nxt = THRU;
 	   end
-
-	   if (cnt == 0 && reg_ctrl[0])
-	     state_nxt = GEN_HDRS;
+	   else begin
+	     if (cnt == 0 && reg_ctrl[0])
+	       state_nxt = GEN_HDRS;
+	   end
 	end
 
 	THRU: begin
