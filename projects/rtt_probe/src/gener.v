@@ -168,8 +168,8 @@ module gener
       pkt_upcnt = 0;
       out_wr_int = 0;
       in_fifo_rd_en = 0;
-      out_data_int = in_fifo_data;
-      out_ctrl_int = in_fifo_ctrl;
+      out_ctrl_int = 8'h0;
+      out_data_int = 64'h0a11223308014444;
 
       state_nxt = state;
       cnt_nxt = cnt;
@@ -182,6 +182,9 @@ module gener
 	   if (!in_fifo_empty && out_rdy) begin
 	      out_wr_int = 1;
               in_fifo_rd_en = 1;
+
+	      out_data_int = in_fifo_data;
+	      out_ctrl_int = in_fifo_ctrl;
 
 	      state_nxt = THRU;
 	   end
@@ -198,6 +201,9 @@ module gener
 	   if (!in_fifo_empty && out_rdy) begin
 	      out_wr_int = 1;
               in_fifo_rd_en = 1;
+
+	      out_data_int = in_fifo_data;
+	      out_ctrl_int = in_fifo_ctrl;
 
 	      if (|in_fifo_ctrl)
 		state_nxt = WAIT_HDRS_OR_TIME;
@@ -219,9 +225,6 @@ module gener
 	   if (out_rdy) begin
 	      out_wr_int = 1;
 
-	      out_ctrl_int = 8'h0;
-	      out_data_int = 64'h0011223344550011;
-
 	      state_nxt = GEN_MAC1;
 	   end
 	end
@@ -230,20 +233,14 @@ module gener
 	   if (out_rdy) begin
 	      out_wr_int = 1;
 
-	      out_ctrl_int = 8'h0;
-	      out_data_int = 64'h2233445508014444;
-
 	      state_nxt = GEN_BODY;
-	      cnt_nxt = reg_len[18:3] - 3; // already generated 2 MAC words + 1 in next cycle
+	      cnt_nxt = reg_len[18:3] - 4; // already generated 2 MAC words + 1 in next cycle + 1 for GEN_END
 	   end
 	end
 
 	GEN_BODY: begin
 	   if (out_rdy) begin
 	      out_wr_int = 1;
-
-	      out_ctrl_int = 8'h0;
-	      out_data_int = 64'h0011223344556677;
 
 	      cnt_nxt = cnt - 1;
 
@@ -255,10 +252,10 @@ module gener
 	GEN_END: begin
 	   if (out_rdy) begin
 	      pkt_upcnt = 1;
+
 	      out_wr_int = 1;
 
 	      out_ctrl_int = 8'hff;
-	      out_data_int = 64'h0;
 
 	      state_nxt = WAIT_HDRS_OR_TIME;
 	      cnt_nxt = reg_ifg;
