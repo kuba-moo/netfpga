@@ -84,6 +84,11 @@ module gener
    wire [31:0]			 reg_ctrl;
    wire [31:0]			 reg_hw_state;
 
+   wire 			 rng_seed_wr;
+   wire [31:0] 			 reg_rng_seed;
+   wire [63:0] 			 rng_out;
+   reg 				 rng_kick;
+
    //------------------------- Local assignments -------------------------------
 
    assign in_rdy     = !in_fifo_nearly_full;
@@ -105,6 +110,8 @@ module gener
 			  out_rdy,      // 7
 			  state         // 6:0
 			  };
+
+   assign rng_seed_wr = reg_ctrl[2];
 
    //------------------------- Modules-------------------------------
 
@@ -152,19 +159,29 @@ module gener
       .counter_decrement(),
 
       // --- SW regs interface
-      .software_regs    ({reg_ifg, reg_len, reg_ctrl}),
+      .software_regs    ({reg_rng_seed, reg_ifg, reg_len, reg_ctrl}),
 
       // --- HW regs interface
-      .hardware_regs    (reg_hw_state),
+      .hardware_regs    ({reg_hw_state, rng_out}),
 
       .clk              (clk),
       .reset            (reset)
     );
 
+   rng some_rng
+     (
+      .clk (clk),
+      .seed_wr(rng_seed_wr),
+      .seed(reg_rng_seed),
+      .out(rng_out),
+      .kick(rng_kick)
+      );
+
    //------------------------- Logic-------------------------------
 
    always @(*) begin
       // Default values
+      rng_kick = 0;
       pkt_upcnt = 0;
       out_wr_int = 0;
       in_fifo_rd_en = 0;
@@ -256,6 +273,9 @@ module gener
 	      out_wr_int = 1;
 
 	      out_ctrl_int = 8'h01;
+	      out_data_int = rng_out;
+
+	      rng_kick = 1;
 
 	      state_nxt = WAIT_HDRS_OR_TIME;
 	      cnt_nxt = reg_ifg;

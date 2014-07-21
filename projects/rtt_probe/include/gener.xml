@@ -26,6 +26,21 @@
                         <nf:description>space between packets</nf:description>
                         <nf:type>generic_software32</nf:type>
                 </nf:register>
+                <nf:register>
+                        <nf:name>seed</nf:name>
+                        <nf:description>seed for rng</nf:description>
+                        <nf:type>generic_software32</nf:type>
+                </nf:register>
+		<nf:register>
+                        <nf:name>rng_out_lo</nf:name>
+                        <nf:description>output of rng</nf:description>
+                        <nf:type>generic_hardware32</nf:type>
+                </nf:register>
+		<nf:register>
+                        <nf:name>rng_out_hi</nf:name>
+                        <nf:description>output of rng</nf:description>
+                        <nf:type>generic_hardware32</nf:type>
+                </nf:register>
 		<nf:register>
                         <nf:name>status</nf:name>
                         <nf:description>status register</nf:description>
@@ -45,6 +60,10 @@
 			<nf:bitmask>
 				<nf:name>enable_send</nf:name>
 				<nf:pos>1</nf:pos>
+			</nf:bitmask>
+			<nf:bitmask>
+				<nf:name>enable_wr_seed</nf:name>
+				<nf:pos>2</nf:pos>
 			</nf:bitmask>
 		</nf:type>
 		<nf:type xsi:type="nf:SimpleType">
