@@ -4,7 +4,7 @@
         <nf:prefix>gener</nf:prefix>
         <nf:location>udp</nf:location>
         <nf:description>Generator Module Registers</nf:description>
-        <nf:blocksize>32</nf:blocksize>
+        <nf:blocksize>64</nf:blocksize>
         <nf:registers>
                 <nf:register>
                         <nf:name>cnt_pkts</nf:name>
@@ -31,6 +31,11 @@
                         <nf:description>seed for rng</nf:description>
                         <nf:type>generic_software32</nf:type>
                 </nf:register>
+                <nf:register>
+                        <nf:name>frame_cnt</nf:name>
+                        <nf:description>number of frames to generate</nf:description>
+                        <nf:type>generic_software32</nf:type>
+                </nf:register>
 		<nf:register>
                         <nf:name>rng_out_lo</nf:name>
                         <nf:description>output of rng</nf:description>
@@ -54,11 +59,11 @@
 			<nf:name>gener_control</nf:name>
 			<nf:width>1</nf:width>
 			<nf:bitmask>
-				<nf:name>reset</nf:name>
+				<nf:name>cont_send</nf:name>
 				<nf:pos>0</nf:pos>
 			</nf:bitmask>
 			<nf:bitmask>
-				<nf:name>enable_send</nf:name>
+				<nf:name>flip_cnt_send</nf:name>
 				<nf:pos>1</nf:pos>
 			</nf:bitmask>
 			<nf:bitmask>

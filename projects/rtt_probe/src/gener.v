@@ -76,15 +76,25 @@ module gener
    reg [15:0] 			 cnt;
    reg [15:0] 			 cnt_nxt;
 
+   wire [31:0] 			 reg_frame_cnt;
+   reg 				 r_flip_cnt_send_old;
+   reg [31:0] 			 frame_cnt;
+   reg [31:0] 			 frame_cnt_nxt;
+   wire 			 frame_cnt_done;
+
+   wire 			 can_start_frame;
+
    wire [DATA_WIDTH-1:0] 	 gen_pkt_hdr;
 
    reg 				 pkt_upcnt;
    wire [31:0] 			 reg_ifg;
    wire [31:0]			 reg_len;
    wire [31:0]			 reg_ctrl;
+     wire 			   r_cont_send;
+     wire 			   r_flip_cnt_send;
+     wire 			   r_rng_seed_wr;
    wire [31:0]			 reg_hw_state;
 
-   wire 			 rng_seed_wr;
    wire [31:0] 			 reg_rng_seed;
    wire [63:0] 			 rng_out;
    reg 				 rng_kick;
@@ -103,7 +113,8 @@ module gener
 			  reg_len[15:0]};// len bytes
 
    assign reg_hw_state = {cnt,          // 31:16
-			  reg_len[7:3], // 15:11
+			  reg_len[7:4], // 15:12
+			  frame_cnt_done, // 11
 			  pkt_upcnt,    // 10
 			  out_wr_int,   // 9
 			  in_fifo_empty,// 8
@@ -111,7 +122,12 @@ module gener
 			  state         // 6:0
 			  };
 
-   assign rng_seed_wr = reg_ctrl[2];
+   assign r_cont_send     = reg_ctrl[0];
+   assign r_flip_cnt_send = reg_ctrl[1];
+   assign r_rng_seed_wr   = reg_ctrl[2];
+
+   assign frame_cnt_done = !(|frame_cnt);
+   assign can_start_frame = (r_cont_send || !frame_cnt_done) && (!(|cnt));
 
    //------------------------- Modules-------------------------------
 
@@ -137,8 +153,8 @@ module gener
       .TAG                 (`GENER_BLOCK_ADDR),       // Tag -- eg. MODULE_TAG
       .REG_ADDR_WIDTH      (`GENER_REG_ADDR_WIDTH),   // Width of block addresses -- eg. MODULE_REG_ADDR_WIDTH
       .NUM_COUNTERS        (1),                 // Number of counters
-      .NUM_SOFTWARE_REGS   (3),                 // Number of sw regs
-      .NUM_HARDWARE_REGS   (1)                  // Number of hw regs
+      .NUM_SOFTWARE_REGS   (5),                 // Number of sw regs
+      .NUM_HARDWARE_REGS   (3)                  // Number of hw regs
    ) module_regs (
       .reg_req_in       (reg_req_in),
       .reg_ack_in       (reg_ack_in),
@@ -159,7 +175,7 @@ module gener
       .counter_decrement(),
 
       // --- SW regs interface
-      .software_regs    ({reg_rng_seed, reg_ifg, reg_len, reg_ctrl}),
+      .software_regs    ({reg_frame_cnt, reg_rng_seed, reg_ifg, reg_len, reg_ctrl}),
 
       // --- HW regs interface
       .hardware_regs    ({reg_hw_state, rng_out}),
@@ -171,7 +187,7 @@ module gener
    rng some_rng
      (
       .clk (clk),
-      .seed_wr(rng_seed_wr),
+      .seed_wr(r_rng_seed_wr),
       .seed(reg_rng_seed),
       .out(rng_out),
       .kick(rng_kick)
@@ -190,6 +206,7 @@ module gener
 
       state_nxt = state;
       cnt_nxt = cnt;
+      frame_cnt_nxt = frame_cnt;
 
       case (state)
 	WAIT_HDRS_OR_TIME: begin
@@ -206,8 +223,8 @@ module gener
 	      state_nxt = THRU;
 	   end
 	   else begin
-	     if (cnt == 0 && reg_ctrl[0])
-	       state_nxt = GEN_HDRS;
+	      if (can_start_frame)
+		state_nxt = GEN_HDRS;
 	   end
 	end
 
@@ -276,6 +293,8 @@ module gener
 	      out_data_int = rng_out;
 
 	      rng_kick = 1;
+	      if (!frame_cnt_done)
+		frame_cnt_nxt = frame_cnt - 1;
 
 	      state_nxt = WAIT_HDRS_OR_TIME;
 	      cnt_nxt = reg_ifg;
@@ -287,6 +306,12 @@ module gener
    always @(posedge clk) begin
       state <= state_nxt;
       cnt <= cnt_nxt;
+
+      r_flip_cnt_send_old <= r_flip_cnt_send;
+      if (r_flip_cnt_send_old ^ r_flip_cnt_send)
+	frame_cnt <= reg_frame_cnt;
+      else
+	frame_cnt <= frame_cnt_nxt;
 
       if (reset)
 	state <= WAIT_HDRS_OR_TIME;
